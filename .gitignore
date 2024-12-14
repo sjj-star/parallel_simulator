@@ -1,0 +1,7 @@
+/sim_build/
+/sim_test/
+__pycache__
+.*.sw?
+*.log
+*.history
+*.key
