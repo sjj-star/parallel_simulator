@@ -3,13 +3,28 @@
 
 import os
 import struct
-from multiprocessing import shared_memory
+from multiprocessing import shared_memory, resource_tracker
 import atomics
+
+def fix_register(name, rtype):
+    if rtype == "shared_memory":
+        return
+    return resource_tracker._resource_tracker.register(self, name, rtype) # type: ignore
+ 
+def fix_unregister(name, rtype):
+    if rtype == "shared_memory":
+        return
+    return resource_tracker._resource_tracker.unregister(self, name, rtype) # type: ignore
+ 
+def patch_ban_shm_tracing():
+    resource_tracker.register = fix_register
+    resource_tracker.unregister = fix_unregister
+    if "shared_memory" in resource_tracker._CLEANUP_FUNCS:
+        del resource_tracker._CLEANUP_FUNCS["shared_memory"]
 
 import cocotb
 from cocotb.triggers import Timer
 import cocotb.triggers
-
 
 async def generate_clock(clk):
     """Generate clock pulses."""
@@ -50,6 +65,7 @@ async def interface_agent(dut):
     shm_name = os.getenv("HLV_SHM")
     inf_type = os.getenv("HLV_INF_TYPE")
     if shm_name:
+        patch_ban_shm_tracing()
         shm = shared_memory.SharedMemory(shm_name)
         sim_buf = shm.buf
         with atomics.atomicview(buffer=sim_buf[:4], atype=atomics.INT) as sim_ready_count:
